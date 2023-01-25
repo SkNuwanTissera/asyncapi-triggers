@@ -7,6 +7,7 @@ public type ListenerConfig record {
     string tokenEndpointHost;
     string callbackURL;
     string hubURL;
+    string keyServiceURL;
 };
 
 public type GenericUserData record {
@@ -90,3 +91,34 @@ public type UserGroupUpdateData record {
 };
 
 public type GenericDataType GenericEvent|UserGroupUpdateEvent|LoginSuccessEvent|AddUserEvent;
+
+# Key format
+#
+# + key - Secret key  
+# + type - Type of key (encryptionKey/decryptionKey)
+# + status - Status of the key (active/expired/revoked)  
+# + createdAt - Timestamp of creation  
+# + expiry - Timestamp of expiration  
+# + algo - Key algorithm (RSA/DSA/DiffieHellman)
+# + size - Key size (1024, 2048)
+# + reason - Reason if revoked
+type KeyData record {|
+    string key;
+    string 'type;
+    string status;
+    string createdAt;
+    string expiry;
+    string algo;
+    string size;
+    string reason?;
+|};
+
+type EncryptedPayload record {
+    *GenericSecurityData;
+    string event;
+};
+
+type DecryptedPayload record {
+    *GenericSecurityData;
+    json event;
+};

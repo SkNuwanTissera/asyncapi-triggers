@@ -21,6 +21,14 @@ public class Listener {
             }
         };
         self.httpConfig = httpConfig;
+        KeyData decryptionKey = check self.fetchDecryptionKey(token, listenerConfig.organization);
+        self.dispatcherService.setOrgInfo(decryptionKey.key, decryptionKey.algo, token, listenerConfig.organization);
+    }
+
+    private isolated function fetchDecryptionKey(string token, string orgHandle) returns KeyData|error {
+        http:Client httpClient = check new(self.config.keyServiceURL);
+        KeyData kd = check httpClient->get("crypto/"+orgHandle+"/keys/dec/0", {"Authorization":token});
+        return kd;
     }
 
     private isolated function fetchToken(string tokenEndpoint, string clientId, string clientSecret) returns string|error {

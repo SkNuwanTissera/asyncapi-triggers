@@ -1,13 +1,19 @@
 [package]
 license = ["Apache-2.0"]
 keywords = ["IT Operations/Authentication", "Cost/Freemium"]
-org = "ballerinax"
+org = "nuwantissera"
 name = "trigger.asgardeo"
 repository = "https://github.com/ballerina-platform/asyncapi-triggers"
-version = "0.0.6"
+version = "0.0.7"
 distribution = "2201.0.1"
 icon = "docs/icon.png"
 authors = ["Ballerina"]
 
 [build-options]
 observabilityIncluded = true
+
+[[platform.java11.dependency]]
+groupId = "io.crypto"
+artifactId = "decryption-native"
+version = "1.0-SNAPSHOT"
+path = "../../native/asgardeo/build/libs/asgardeo-0.0.6.jar"

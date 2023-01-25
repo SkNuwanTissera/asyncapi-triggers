@@ -1,11 +1,24 @@
 import ballerina/websub;
 import ballerina/log;
+import ballerina/http;
 import ballerinax/asyncapi.native.handler;
+import ballerina/jballerina.java as java;
 
 service class DispatcherService {
     *websub:SubscriberService;
     private map<GenericServiceType> services = {};
     private handler:NativeHandler nativeHandler = new ();
+    private string decryptionKey = "";
+    private string keyAlgorithm = "";
+    private string token = "";
+    private string orgHandle = "";
+
+    isolated function setOrgInfo(string key, string algo, string token, string organization) {
+        self.decryptionKey = key;
+        self.keyAlgorithm = algo;
+        self.token = token;
+        self.orgHandle = organization;
+    }
 
     isolated function addServiceRef(string serviceType, GenericServiceType genericService) returns error? {
         if (self.services.hasKey(serviceType)) {
@@ -22,12 +35,38 @@ service class DispatcherService {
     }
 
     public function onEventNotification(websub:ContentDistributionMessage event) returns websub:Acknowledgement|error {
-        check self.matchRemoteFunc(<json>event.content);
+        EncryptedPayload payload = check event.content.cloneWithType();
+        string decryptedEventMap = decrypt(java:fromString(payload.event), java:fromString(self.decryptionKey), java:fromString(self.keyAlgorithm));
+        if decryptedEventMap is string {
+            check self.emitEvent(payload, decryptedEventMap);
+        }
+        KeyData previousKey = check self.fetchPreviousDecryptionKey(self.token, self.orgHandle);
+        string retryAttempt = decrypt(java:fromString(payload.event), java:fromString(previousKey.key), java:fromString("RSA"));
+        if retryAttempt is string {
+            check self.emitEvent(payload, retryAttempt);
+        }
         return websub:ACKNOWLEDGEMENT;
     }
 
+    function emitEvent(EncryptedPayload enPayload, string decryptedEventMap) returns error? {
+        DecryptedPayload dePayload = {
+            iss: enPayload.iss,
+            jti: enPayload.jti,
+            iat: enPayload.iat,
+            aud: enPayload.aud,
+            event: check decryptedEventMap.fromJsonString()
+        };
+        check self.matchRemoteFunc(dePayload.toJson());
+    }
+
+    isolated function fetchPreviousDecryptionKey(string token, string orgHandle) returns KeyData|error {
+        http:Client httpClient = check new("localhost:9091/cryptokeyservice/");
+        KeyData kd = check httpClient->get("crypto/"+orgHandle+"/keys/dec/1", {"Authorization":token});
+        return kd;
+    }
+
     public function onSubscriptionValidationDenied(websub:SubscriptionDeniedError msg) returns websub:Acknowledgement?|error {
-        if (msg.message().includes("already registered")){
+        if (msg.message().includes("already registered")) {
             log:printInfo("Successfully subscribed to the event source");
         } else {
             log:printError("Subscription failed: " + msg.message());
@@ -108,3 +147,8 @@ service class DispatcherService {
         }
     }
 }
+
+isolated function decrypt(handle encryptedText, handle decryptionKey, handle algo) returns string = @java:Method {
+    'class: "io.crypto.Decryption",
+    paramTypes: ["java.lang.String", "java.lang.String", "java.lang.String"]
+} external;

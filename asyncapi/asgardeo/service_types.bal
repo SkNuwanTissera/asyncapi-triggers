@@ -17,3 +17,8 @@ public type LoginService service object {
 };
 
 public type GenericServiceType RegistrationService|UserOperationService|LoginService;
+
+public type Error DecryptError;
+
+public type DecryptError distinct error;
+
